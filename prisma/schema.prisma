@@ -7,3 +7,92 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id                              String                @id @default(uuid())
+  name                            String                
+  email                           String                @unique
+  password                        String                
+  avatarUrl                       String?               
+  bio                             String?               
+  role                            Role                  @default(USER)
+  createdAt                       DateTime              @default(now())
+  updatedAt                       DateTime              @updatedAt
+
+  contents                        Content[]
+  playlists                       Playlist[]
+  subscriptions                   Subscription[]
+  comments                        Comment[]
+}
+
+enum Role {
+  USER
+  CREATOR
+  ADMIN
+}
+
+model Content {
+  id                              String                @id @default(uuid())
+  title                           String                
+  description                     String                
+  type                            ContentType           
+  url                             String                
+  thumbnailUrl                    String
+  duration                        Int
+  status                          ContentStatus         @default(PENDING)
+  createdAt                       DateTime              @default(now())
+  userId                          String
+  user                            User                  @relation(fields: [userId], references: [id])
+                  
+  comments                        Comment[]
+  views                           Int                   @default(0)
+  likes                           Int                   @default(0)
+                  
+  playlists                       Playlist[]            @relation("PlaylistContents")
+}
+
+enum ContentType {
+  VIDEO
+  PODCAST
+  DOCUMENTARY
+}
+
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Playlist {
+  id                              String                @id @default(uuid())
+  name                            String                
+  userId                          String
+  user                            User                  @relation(fields: [userId], references: [id])
+  contents                        Content[]             @relation("PlaylistContents")
+}
+
+model Comment {
+  id                              String                @id @default(uuid())
+  content                         String                
+  createdAt                       DateTime              @default(now())
+  userId                          String
+  user                            User                  @relation(fields: [userId], references: [id])
+  contentId                       String
+  contentObj                      Content               @relation(fields: [contentId], references: [id])
+}
+
+model Subscription {
+  id                              String                @id @default(uuid())
+  userId                          String
+  plan                            SubscriptionPlan      @default(FREE)
+  startDate                       DateTime              @default(now())
+  endDate                         DateTime
+
+  user                            User                  @relation(fields: [userId], references: [id])
+}
+
+enum SubscriptionPlan {
+  FREE
+  EDUCATIONAL
+  PREMIUM
+}
