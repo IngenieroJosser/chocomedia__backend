@@ -5,8 +5,9 @@ import { ContentModule } from './modules/content/content.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MediaModule } from './modules/media/media.module';
 import { LoggerModule } from './logger/logger.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, ContentModule, AdminModule, MediaModule, LoggerModule],
+  imports: [AuthModule, UsersModule, ContentModule, AdminModule, MediaModule, LoggerModule, PrismaModule],
 })
 export class AppModule {}
