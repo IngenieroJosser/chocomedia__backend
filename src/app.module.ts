@@ -6,8 +6,9 @@ import { AdminModule } from './modules/admin/admin.module';
 import { MediaModule } from './modules/media/media.module';
 import { LoggerModule } from './logger/logger.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PaymentModule } from './modules/payment/payment.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, ContentModule, AdminModule, MediaModule, LoggerModule, PrismaModule],
+  imports: [AuthModule, UsersModule, ContentModule, AdminModule, MediaModule, LoggerModule, PrismaModule, PaymentModule],
 })
 export class AppModule {}
