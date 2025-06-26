@@ -8,35 +8,242 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Modelo principal de usuario para la plataforma
+/// Almacena información de todos los usuarios (consumidores, creadores, administradores)
 model User {
-  id                        Int                   @id @default(autoincrement())
-  email                     String                @unique
-  password                  String                
-  name                      String?               
-  role                      Role                  @default(USER)
-  content                   Content[]             
-  createdAt                 DateTime              @default(now())
+  id                              Int                             @id @default(autoincrement())
+  email                           String                          @unique
+  password                        String                          // Almacenar hash de la contraseña
+  name                            String?             
+  role                            Role                            @default(USER)
+  stripeCustomerId                String?                         @unique // ID de cliente en Stripe
+  createdAt                       DateTime                        @default(now())
+  updatedAt                       DateTime                        @updatedAt
+
+  // Relaciones                           
+  profile                         Profile?                        // Perfil público
+  content                         Content[]                       // Contenido publicado
+  subscriptions                   Subscription[]                  // Suscripciones activas
+  payments                        Payment[]                       // Historial de pagos
+  unlocks                         Unlock[]                        // Contenidos desbloqueados
+  favorites                       Favorite[]                      // Contenidos favoritos
+  analytics                       UserAnalytic[]                  // Eventos de analítica del usuario
+  notifications                   Notification[]                  // Notificaciones del usuario
+  creatorPlan                     CreatorPlan?                    // Plan de creador (si es creador)
+  comments                        Comment[]                       // Comentarios realizados
+  contentAnalytics                ContentAnalytic[]               // Métricas de contenido asociadas
 }
 
+/// Perfil público del usuario
+/// Información visible para otros usuarios
+model Profile {
+  id                              Int                             @id @default(autoincrement())
+  bio                             String?                       
+  avatar                          String?                         // URL de la imagen
+  website                         String?                       
+  socialLinks                     Json?                           // Array de objetos { platform: string, url: string }
+  userId                          Int                             @unique
+  user                            User                            @relation(fields: [userId], references: [id])
+}
+
+/// Contenido multimedia (videos, podcasts, artículos)
 model Content {
-  id                        Int                   @id @default(autoincrement())
-  title                     String                
-  description               String                
-  type                      ContentType           // VIDEO, AUDIO, TEXT
-  url                       String?               
-  premium                   Boolean               @default(false)
-  author                    User                  @relation(fields: [authorId], references: [id])
-  authorId                  Int
+  id                              Int                             @id @default(autoincrement())
+  title                           String
+  description                     String
+  type                            ContentType
+  url                             String?                         // URL del recurso (video, audio, etc.)
+  thumbnail                       String?                         // URL de la miniatura
+  duration                        Int?                            // Duración en segundos (para audio/video)
+  wordCount                       Int?                            // Cantidad de palabras (para texto)
+  premium                         Boolean                           @default(false) // Requiere pago para acceder
+  price                           Float?                            // Precio de desbloqueo individual
+  author                          User                              @relation(fields: [authorId], references: [id])
+  authorId                        Int
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime                          @updatedAt
+  category                        String?                           // Categoría o etiqueta principal
+  tags                            String[]                          // Etiquetas adicionales
+
+  // Relaciones
+  unlocks                         Unlock[]                          // Registro de desbloqueos
+  favorites                       Favorite[]                        // Usuarios que lo han marcado como favorito
+  analytics                       ContentAnalytic[]                   // Métricas de visualización
+  comments                        Comment[]                           // Comentarios en el contenido
+  payments                        Payment[]                           // Pagos asociados a este contenido
 }
 
+/// Planes de creador (gratis, pro, plus)
+model CreatorPlan {
+  id                              Int                             @id @default(autoincrement())
+  type                            PlanType                        @default(FREE)
+  userId                          Int                             @unique
+  user                            User                            @relation(fields: [userId], references: [id])
+  stripeSubscriptionId            String?                         // ID de suscripción en Stripe
+  startDate                       DateTime? 
+  endDate                         DateTime?
+}
+
+/// Suscripciones de usuarios premium
+model Subscription {
+  id                              Int                             @id @default(autoincrement())
+  userId                          Int
+  user                            User                            @relation(fields: [userId], references: [id])
+  planType                        PlanType                        // USER_PREMIUM
+  stripeSubscriptionId            String                          // ID de suscripción en Stripe
+  startDate                       DateTime                        @default(now())
+  endDate                         DateTime?
+  status                          SubscriptionStatus              @default(ACTIVE)
+}
+
+/// Registro de pagos (suscripciones, desbloqueos de contenido)
+model Payment {
+  id                              Int                             @id @default(autoincrement())
+  amount                          Float
+  currency                        String                          @default("USD")
+  userId                          Int
+  user                            User                            @relation(fields: [userId], references: [id])
+  createdAt                       DateTime                        @default(now())
+  contentId                       Int?                            // Si es pago por contenido
+  content                         Content?                          @relation(fields: [contentId], references: [id])
+  type                            PaymentType
+  status                          PaymentStatus                     @default(COMPLETED)
+  stripePaymentId                 String?                           // ID de pago en Stripe
+  unlock                          Unlock?                           // Desbloqueo asociado a este pago
+}
+
+/// Registro de contenido desbloqueado por usuarios
+model Unlock {
+  id                              Int                               @id @default(autoincrement())
+  userId                          Int
+  user                            User                              @relation(fields: [userId], references: [id])
+  contentId                       Int
+  content                         Content                           @relation(fields: [contentId], references: [id])
+  unlockedAt                      DateTime                          @default(now())
+  paymentId                       Int?                              @unique // Campo único para relación 1:1
+  payment                         Payment?                          @relation(fields: [paymentId], references: [id])
+  
+  @@unique([userId, contentId]) // Un usuario no puede desbloquear dos veces el mismo contenido
+}
+
+/// Contenidos marcados como favoritos
+model Favorite {
+  id                              Int                               @id @default(autoincrement())
+  userId                          Int
+  user                            User                              @relation(fields: [userId], references: [id])
+  contentId                       Int
+  content                         Content                           @relation(fields: [contentId], references: [id])
+  favoritedAt                     DateTime                          @default(now())
+  
+  @@unique([userId, contentId]) // Un usuario no puede marcar dos veces el mismo contenido como favorito
+}
+
+/// Métricas de contenido (visualizaciones, tiempo de visualización, etc.)
+model ContentAnalytic {
+  id                              Int                               @id @default(autoincrement())
+  contentId                       Int
+  content                         Content                           @relation(fields: [contentId], references: [id])
+  userId                          Int?
+  user                            User?                             @relation(fields: [userId], references: [id])
+  eventType                       AnalyticEventType
+  duration                        Int?                              // Tiempo de visualización/reproducción en segundos
+  percentage                      Int?                              // Porcentaje consumido
+  timestamp                       DateTime                          @default(now())
+  deviceType                      String?                           // Móvil, escritorio, etc.
+  location                        String?                           // País o región
+}
+
+/// Métricas de usuario (sesiones, acciones)
+model UserAnalytic {
+  id                              Int                               @id @default(autoincrement())
+  userId                          Int
+  user                            User                              @relation(fields: [userId], references: [id])
+  eventType                       String                            // "SESSION_START", "SEARCH", "CONTENT_CREATE", etc.
+  timestamp                       DateTime                          @default(now())
+  metadata                        Json?                             // Datos adicionales en formato JSON
+}
+
+/// Notificaciones para usuarios
+model Notification {
+  id                              Int                               @id @default(autoincrement())
+  userId                          Int                               
+  user                            User                              @relation(fields: [userId], references: [id])
+  type                            String                            // "SYSTEM", "CONTENT", "PAYMENT", "NEW_FOLLOWER"
+  title                           String
+  message                         String
+  read                            Boolean                           @default(false)
+  createdAt                       DateTime                          @default(now())
+  link                            String?                           // URL para redirigir
+}
+
+/// Comentarios en el contenido
+model Comment {
+  id                              Int                                 @id @default(autoincrement())
+  text                            String
+  userId                          Int
+  user                            User                                @relation(fields: [userId], references: [id])
+  contentId                       Int
+  content                         Content                             @relation(fields: [contentId], references: [id])
+  createdAt                       DateTime                        @default(now())
+  updatedAt                       DateTime                        @updatedAt
+  parentId                        Int?                            // Para comentarios anidados
+  parent                          Comment?                        @relation("CommentReplies", fields: [parentId], references: [id])
+  replies                         Comment[]                       @relation("CommentReplies")
+}
+
+// ======= ENUMS =======
+
+/// Roles de usuario en la plataforma
 enum Role {
-  USER
-  CREATOR
-  ADMIN
+  USER     // Usuario normal
+  CREATOR  // Creador de contenido
+  ADMIN    // Administrador del sistema
 }
 
+/// Tipos de contenido
 enum ContentType {
   VIDEO
   AUDIO
   TEXT
+}
+
+/// Tipos de planes disponibles
+enum PlanType {
+  FREE           // Plan gratuito para creadores
+  CREATOR_PRO    // Plan profesional para creadores ($9)
+  CREATOR_PLUS   // Plan premium para creadores ($19)
+  USER_PREMIUM   // Plan premium para consumidores ($4.99)
+}
+
+/// Estados de suscripción
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAUSED
+}
+
+/// Tipos de pago
+enum PaymentType {
+  SUBSCRIPTION   // Pago recurrente
+  CONTENT_UNLOCK  // Desbloqueo de contenido individual
+  DONATION       // Donación a creador
+}
+
+/// Estados de pago
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+/// Eventos de analítica registrables
+enum AnalyticEventType {
+  VIEW     // Visualización de página/contenido
+  PLAY     // Inicio de reproducción
+  PROGRESS // Progreso de reproducción
+  COMPLETE // Finalización de contenido
+  SHARE    // Compartir contenido
+  DOWNLOAD // Descarga de recurso
 }
