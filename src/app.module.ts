@@ -9,6 +9,15 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentModule } from './modules/payment/payment.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, ContentModule, AdminModule, MediaModule, LoggerModule, PrismaModule, PaymentModule],
+  imports: [
+    AuthModule, 
+    UsersModule, 
+    ContentModule, 
+    AdminModule, 
+    MediaModule, 
+    LoggerModule, 
+    PrismaModule, 
+    PaymentModule
+  ],
 })
 export class AppModule {}

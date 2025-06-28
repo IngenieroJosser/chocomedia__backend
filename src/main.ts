@@ -7,12 +7,12 @@ async function bootstrap() {
   app.enableCors();
 
   const config = new DocumentBuilder()
-    .setTitle('Chocomedia API')
-    .setDescription('Chocomedia API description')
+    .setTitle('Senda API')
+    .setDescription('Senda API description')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('chocomedia', app, document);
+  SwaggerModule.setup('senda', app, document);
 
   await app.listen(process.env.PORT ?? 3001);
 }
