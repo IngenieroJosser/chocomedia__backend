@@ -1,12 +1,17 @@
-import { Injectable, ConflictException, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, InternalServerErrorException, NotFoundException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import * as bcrypt from 'bcryptjs';
 import { SignInDto } from './dto/sign-in.dto';
+import { JwtService } from '@nestjs/jwt';
+import { RefreshTokenDto } from './dto/refresh-token';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async accountUser(dtoSignUp: SignUpDto) {
     const email = dtoSignUp.email.trim().toLowerCase();
@@ -30,6 +35,7 @@ export class AuthService {
           name,
           email,
           password: hashedPassword,
+          refreshToken,
         },
         select: {
           id: true,
@@ -96,4 +102,31 @@ export class AuthService {
 
     return foundUserById;
   }
+
+  async refreshTokens(dtoRefreshToken: RefreshTokenDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: dtoRefreshToken.userId } });
+    
+    if (!user || !user.refreshToken) {
+      throw new ForbiddenException('Acceso denegado');
+    }
+    
+    const refreshTokenMatches = await bcrypt.compare(
+      dtoRefreshToken.refreshToken,
+      user.refreshToken
+    );
+    
+    if (!refreshTokenMatches) throw new ForbiddenException('Acceso denegado');
+    
+    const payload = { sub: user.id, email: user.email, name: user.name };
+    const newAccessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: process.env.EXPIRESIN
+    });
+    
+    return {
+      access_token: newAccessToken
+    };
+  }
+
+  
 }

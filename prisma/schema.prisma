@@ -19,6 +19,7 @@ model User {
   stripeCustomerId                String?                         @unique // ID de cliente en Stripe
   createdAt                       DateTime                        @default(now())
   updatedAt                       DateTime                        @updatedAt
+  refreshToken                    String
 
   // Relaciones                           
   profile                         Profile?                        // Perfil público
