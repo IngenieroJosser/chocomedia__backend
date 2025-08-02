@@ -35,7 +35,7 @@ export class AuthService {
           name,
           email,
           password: hashedPassword,
-          refreshToken,
+          refreshToken: '',
         },
         select: {
           id: true,
